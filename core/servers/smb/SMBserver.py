@@ -4,7 +4,7 @@ import threading
 import os
 
 from socket import error as socketerror
-from impacket import version, smbserver, LOG
+from mitmflib.impacket import version, smbserver, LOG
 from core.servers.smb.KarmaSMB import KarmaSMBServer
 from core.configwatcher import ConfigWatcher
 from core.utils import shutdown
@@ -62,7 +62,7 @@ class SMBserver(ConfigWatcher):
         
         except socketerror as e:
             if "Address already in use" in e:
-                shutdown("\n[-] Unable to start SMB server on port {}: port already in use".format(listenPort))
+                shutdown("\n[-] Unable to start SMB server on port {}: port already in use".format(self.smb_port))
 
     def configureLogging(self, formatter):
         #yes I know this looks awful, yuck
