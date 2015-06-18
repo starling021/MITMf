@@ -18,10 +18,18 @@
 # USA
 #
 
+"""
+
+[enabled | disabled] by @xtr4nge
+
+"""
+
 import logging
 from cStringIO import StringIO
 from plugins.plugin import Plugin
 from PIL import Image, ImageFile
+
+from configobj import ConfigObj
 
 mitmf_logger = logging.getLogger("mitmf")
 
@@ -32,6 +40,14 @@ class Upsidedownternet(Plugin):
     version    = "0.1"
     has_opts   = False
 
+    # @xtr4nge
+    def getStatus(self):
+        self.pluginStatus = ConfigObj("config/plugins.conf")
+        if self.pluginStatus['plugins'][self.optname]['status'] == "enabled":
+            return True
+        else:
+            return False
+
     def initialize(self, options):
         globals()['Image'] = Image
         globals()['ImageFile'] = ImageFile
@@ -39,31 +55,33 @@ class Upsidedownternet(Plugin):
 
     def serverHeaders(self, response, request):
         '''Kill the image skipping that's in place for speed reasons'''
-        if request.isImageRequest:
-            request.isImageRequest = False
-            request.isImage = True
-            self.imageType = response.headers['content-type'].split('/')[1].upper()
+        if self.getStatus():
+            if request.isImageRequest:
+                request.isImageRequest = False
+                request.isImage = True
+                self.imageType = response.headers['content-type'].split('/')[1].upper()
 
     def serverResponse(self, response, request, data):
-        try:
-            isImage = getattr(request, 'isImage')
-        except AttributeError:
-            isImage = False
-        
-        if isImage:
+        if self.getStatus():
             try:
-                #For some reason more images get parsed using the parser
-                #rather than a file...PIL still needs some work I guess
-                p = ImageFile.Parser()
-                p.feed(data)
-                im = p.close()
-                im = im.transpose(Image.ROTATE_180)
-                output = StringIO()
-                im.save(output, format=self.imageType)
-                data = output.getvalue()
-                output.close()
-                mitmf_logger.info("{} [Upsidedownternet] Flipped image".format(response.getClientIP()))
-            except Exception as e:
-                mitmf_logger.info("{} [Upsidedownternet] Error: {}".format(response.getClientIP(), e))
-        
-        return {'response': response, 'request': request, 'data': data}
+                isImage = getattr(request, 'isImage')
+            except AttributeError:
+                isImage = False
+            
+            if isImage:
+                try:
+                    #For some reason more images get parsed using the parser
+                    #rather than a file...PIL still needs some work I guess
+                    p = ImageFile.Parser()
+                    p.feed(data)
+                    im = p.close()
+                    im = im.transpose(Image.ROTATE_180)
+                    output = StringIO()
+                    im.save(output, format=self.imageType)
+                    data = output.getvalue()
+                    output.close()
+                    mitmf_logger.info("{} [Upsidedownternet] Flipped image".format(response.getClientIP()))
+                except Exception as e:
+                    mitmf_logger.info("{} [Upsidedownternet] Error: {}".format(response.getClientIP(), e))
+            
+            return {'response': response, 'request': request, 'data': data}
