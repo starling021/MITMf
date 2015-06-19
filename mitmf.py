@@ -18,6 +18,12 @@
 # USA
 #
 
+"""
+
+[enabled | disabled] by @xtr4nge
+
+"""
+
 import argparse
 import sys
 import os
@@ -30,6 +36,15 @@ from core.sslstrip.CookieCleaner import CookieCleaner
 from core.sergioproxy.ProxyPlugins import ProxyPlugins
 from core.utils import Banners, SystemConfig, shutdown
 from plugins import *
+
+# @xtr4nge
+import multiprocessing, time, signal
+from flask import Flask
+from configobj import ConfigObj
+import json
+
+# @xtr4nge
+pluginStatus = ConfigObj("config/plugins.conf")
 
 Banners().printBanner()
 
@@ -128,6 +143,10 @@ for p in plugins:
     #load only the plugins that have been called at the command line
     if vars(args)[p.optname] is True:
 
+        # @xtr4nge
+        pluginStatus['plugins'][p.optname]['status'] = "enabled"
+        pluginStatus.write()
+
         print "|_ {} v{}".format(p.name, p.version)
         if p.tree_info:
             for line in xrange(0, len(p.tree_info)):
@@ -187,8 +206,77 @@ from core.servers.smb.SMBserver import SMBserver
 print "|_ SMB server online [Mode: {}] (Impacket {}) \n".format(SMBserver.getInstance().server_type, SMBserver.getInstance().impacket_ver)
 SMBserver.getInstance().start()
 
+'''
 #start the reactor
 reactor.run()
 
 print "\n"
 shutdown()
+'''
+
+# ------------------------------------
+# @xtr4nge [enabled | disabled]
+# ------------------------------------
+app = Flask(__name__)
+
+@app.route("/getPlugins")
+def getPlugins():
+    # Lists all the plugins supporting [enabled|disabled] (check: config/plugins.conf)
+    # example: http://127.0.0.1:9090/getPlugins
+    pluginList = {"cachekill", "screen", "browserprofiler", "appoison", "replace", "smbtrap", "upsidedownternet"}
+    
+    data = {}
+    for item in pluginList:
+        data[item] = [pluginStatus['plugins'][item]['status']]
+    
+    return json.dumps(data)
+    
+@app.route("/getPluginStatus/<plugin>")
+def getPluginStatus(plugin):
+    # example: http://127.0.0.1:9090/getPluginStatus/cachekill
+    return pluginStatus['plugins'][plugin]['status']
+
+@app.route("/setPluginStatus/<plugin>/<status>")
+def setPluginStatus(plugin, status):
+    # example: http://127.0.0.1:9090/setPluginStatus/cachekill/1 # enabled
+    # example: http://127.0.0.1:9090/setPluginStatus/cachekill/0 # disabled
+    if status == "1":
+        pluginStatus['plugins'][plugin]['status'] = "enabled"
+        pluginStatus.write()
+    elif status == "0":
+        pluginStatus['plugins'][plugin]['status'] = "disabled"
+        pluginStatus.write()
+    
+    return getPluginStatus(plugin)
+
+# @xtr4nge
+def startFlask():
+    app.run(host='127.0.0.1', port=9090)
+
+# @xtr4nge
+def startCore():
+    #start the reactor
+    reactor.run()
+
+# @xtr4nge
+try:
+    pool = {}
+    pool[0] = multiprocessing.Process(name="core", target=startCore)
+    pool[1] = multiprocessing.Process(name="api", target=startFlask)
+    pool[0].start()
+    pool[1].start()
+
+    while True:
+        pass
+
+except KeyboardInterrupt:
+    shutdown()
+    pool[0].terminate()
+    pool[1].terminate()
+except Exception as e:
+    print e
+    shutdown()
+    pool[0].terminate()
+    pool[1].terminate()
+finally:
+    print "bye ;)" 

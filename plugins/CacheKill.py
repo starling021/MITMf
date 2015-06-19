@@ -18,8 +18,16 @@
 # USA
 #
 
+"""
+
+[API] enabled|disabled by @xtr4nge
+
+"""
+
 import logging
 from plugins.plugin import Plugin
+
+from configobj import ConfigObj
 
 mitmf_logger = logging.getLogger("mitmf")
 
@@ -29,17 +37,27 @@ class CacheKill(Plugin):
     desc        = "Kills page caching by modifying headers"
     version     = "0.1"
 
+    # @xtr4nge
+    def getStatus(self):
+        self.pluginStatus = ConfigObj("config/plugins.conf")
+        if self.pluginStatus['plugins'][self.optname]['status'] == "enabled":
+            return True
+        else:
+            return False
+
     def initialize(self, options):
         self.bad_headers = ['if-none-match', 'if-modified-since']
 
     def serverHeaders(self, response, request):
         '''Handles all response headers'''
-        response.headers['Expires'] = "0"
-        response.headers['Cache-Control'] = "no-cache"
+        if self.getStatus():
+            response.headers['Expires'] = "0"
+            response.headers['Cache-Control'] = "no-cache"
 
     def clientRequest(self, request):
         '''Handles outgoing request'''
-        request.headers['pragma'] = 'no-cache'
-        for header in self.bad_headers:
-            if header in request.headers:
-                del request.headers[header]
+        if self.getStatus():
+            request.headers['pragma'] = 'no-cache'
+            for header in self.bad_headers:
+                if header in request.headers:
+                    del request.headers[header]
