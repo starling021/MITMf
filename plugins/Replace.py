@@ -33,8 +33,6 @@ from plugins.plugin import Plugin
 from plugins.CacheKill import CacheKill
 from core.sergioproxy.ProxyPlugins import ProxyPlugins
 
-from configobj import ConfigObj
-
 mitmf_logger = logging.getLogger("mitmf")
 
 class Replace(Plugin):
@@ -44,14 +42,6 @@ class Replace(Plugin):
 	version    = "0.2"
 	has_opts   = False
 
-	# @xtr4nge
-	def getStatus(self):
-		self.pluginStatus = ConfigObj("config/plugins.conf")
-		if self.pluginStatus['plugins'][self.optname]['status'] == "enabled":
-			return True
-		else:
-			return False
-
 	def initialize(self, options):
 		self.options = options
 
@@ -60,26 +50,24 @@ class Replace(Plugin):
 		self.mime = "text/html"
 
 	def serverResponse(self, response, request, data):
-		if self.getStatus():
-			ip, hn, mime = self._get_req_info(response)
-	
-			if self._should_replace(ip, hn, mime):
-	
-				# Did the user provide us with a regex file?
-				for rulename, regexs in self.config['Replace'].iteritems():
-					for regex1,regex2 in regexs.iteritems():
-						if re.search(regex1, data):
-							try:
-								data = re.sub(regex1, regex2, data)
-	
-								mitmf_logger.info("{} [{}] Host: {} Occurances matching '{}' replaced with '{}' according to rule '{}'".format(ip, self.name, hn, regex1, regex2, rulename))
-							except Exception:
-								mitmf_logger.error("{} [{}] Your provided regex ({}) or replace value ({}) is empty or invalid. Please debug your provided regex(es) in rule '{}'" % (ip, hn, regex1, regex2, rulename))
-	
-				self.ctable[ip] = time.time()
-				self.dtable[ip+hn] = True
-	
-			return {'response': response, 'request': request, 'data': data}
+		ip, hn, mime = self._get_req_info(response)
+
+		if self._should_replace(ip, hn, mime):
+
+			for rulename, regexs in self.config['Replace'].iteritems():
+				for regex1,regex2 in regexs.iteritems():
+					if re.search(regex1, data):
+						try:
+							data = re.sub(regex1, regex2, data)
+
+							mitmf_logger.info("{} [{}] Host: {} Occurances matching '{}' replaced with '{}' according to rule '{}'".format(ip, self.name, hn, regex1, regex2, rulename))
+						except Exception:
+							mitmf_logger.error("{} [{}] Your provided regex ({}) or replace value ({}) is empty or invalid. Please debug your provided regex(es) in rule '{}'" % (ip, hn, regex1, regex2, rulename))
+
+			self.ctable[ip] = time.time()
+			self.dtable[ip+hn] = True
+
+		return {'response': response, 'request': request, 'data': data}
 
 	def _should_replace(self, ip, hn, mime):
 		return mime.find(self.mime) != -1

@@ -27,8 +27,6 @@
 import logging
 from plugins.plugin import Plugin
 
-from configobj import ConfigObj
-
 mitmf_logger = logging.getLogger("mitmf")
 
 class CacheKill(Plugin):
@@ -37,22 +35,13 @@ class CacheKill(Plugin):
     desc        = "Kills page caching by modifying headers"
     version     = "0.1"
 
-    # @xtr4nge
-    def getStatus(self):
-        self.pluginStatus = ConfigObj("config/plugins.conf")
-        if self.pluginStatus['plugins'][self.optname]['status'] == "enabled":
-            return True
-        else:
-            return False
-
     def initialize(self, options):
         self.bad_headers = ['if-none-match', 'if-modified-since']
 
     def serverHeaders(self, response, request):
         '''Handles all response headers'''
-        if self.getStatus():
-            response.headers['Expires'] = "0"
-            response.headers['Cache-Control'] = "no-cache"
+        response.headers['Expires'] = "0"
+        response.headers['Cache-Control'] = "no-cache"
 
     def clientRequest(self, request):
         '''Handles outgoing request'''

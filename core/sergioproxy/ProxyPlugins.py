@@ -42,32 +42,25 @@ class ProxyPlugins:
     in handleResponse, but is still annoying.
     '''
     _instance = None
-    
-    plist = []
     mthdDict = {"connectionMade": "clientRequest", 
                 "handleStatus": "serverResponseStatus", 
                 "handleResponse": "serverResponse", 
                 "handleHeader": "serverHeaders", 
                 "handleEndHeaders":"serverHeaders"}
 
-    pmthds = {}
+    def __init__(self):
+        self.pmthds = {}
+        self.plist = []
+        self.plist_all = []
 
     @staticmethod
     def getInstance():
-        if ProxyPlugins._instance == None:
+        if ProxyPlugins._instance is None:
             ProxyPlugins._instance = ProxyPlugins()
 
         return ProxyPlugins._instance
 
-    def setPlugins(self, plugins):
-        '''Set the plugins in use'''
-
-        for p in plugins:
-            self.addPlugin(p)
-
-        mitmf_logger.debug("[ProxyPlugins] Loaded {} plugin/s".format(len(self.plist)))
-
-    def addPlugin(self,p):
+    def addPlugin(self, p):
         '''Load a plugin'''
         self.plist.append(p)
         mitmf_logger.debug("[ProxyPlugins] Adding {} plugin".format(p.name))
@@ -77,12 +70,12 @@ class ProxyPlugins:
             except KeyError:
                 self.pmthds[mthd] = [getattr(p,pmthd)]
 
-    def removePlugin(self,p):
+    def removePlugin(self, p):
         '''Unload a plugin'''
         self.plist.remove(p)
         mitmf_logger.debug("[ProxyPlugins] Removing {} plugin".format(p.name))
         for mthd,pmthd in self.mthdDict.iteritems():
-            self.pmthds[mthd].remove(p)
+            self.pmthds[mthd].remove(getattr(p, pmthd))
 
     def hook(self):
         '''Magic to hook various function calls in sslstrip'''

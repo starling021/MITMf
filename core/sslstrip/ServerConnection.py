@@ -60,7 +60,6 @@ class ServerConnection(HTTPClient):
         self.urlMonitor       = URLMonitor.getInstance()
         self.hsts             = URLMonitor.getInstance().hsts
         self.app              = URLMonitor.getInstance().app
-        self.plugins          = ProxyPlugins.getInstance()
         self.isImageRequest   = False
         self.isCompressed     = False
         self.contentLength    = None
@@ -108,7 +107,7 @@ class ServerConnection(HTTPClient):
     def connectionMade(self):
         mitmf_logger.debug("[ServerConnection] HTTP connection made.")
 
-        self.plugins.hook()
+        ProxyPlugins.getInstance().hook()
         self.sendRequest()
         self.sendHeaders()
         
@@ -117,7 +116,7 @@ class ServerConnection(HTTPClient):
 
     def handleStatus(self, version, code, message):
 
-        values = self.plugins.hook()
+        values = ProxyPlugins.getInstance().hook()
 
         version = values['version']
         code    = values['code']
@@ -164,7 +163,7 @@ class ServerConnection(HTTPClient):
         if self.length == 0:
             self.shutdown()
 
-        self.plugins.hook()
+        ProxyPlugins.getInstance().hook()
 
         if logging.getLevelName(mitmf_logger.getEffectiveLevel()) == "DEBUG":
             for header, value in self.client.headers.iteritems():
@@ -191,7 +190,7 @@ class ServerConnection(HTTPClient):
             data = gzip.GzipFile('', 'rb', 9, StringIO.StringIO(data)).read()
 
         data = self.replaceSecureLinks(data)
-        data = self.plugins.hook()['data']
+        data = ProxyPlugins.getInstance().hook()['data']
 
         mitmf_logger.debug("[ServerConnection] Read from server {} bytes of data".format(len(data)))
 

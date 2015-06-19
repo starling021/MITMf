@@ -30,8 +30,6 @@ from pprint import pformat
 from plugins.plugin import Plugin
 from plugins.Inject import Inject
 
-from configobj import ConfigObj
-
 mitmf_logger = logging.getLogger("mitmf")
 
 class BrowserProfiler(Inject, Plugin):
@@ -40,14 +38,6 @@ class BrowserProfiler(Inject, Plugin):
     desc       = "Attempts to enumerate all browser plugins of connected clients"
     version    = "0.3"
     has_opts   = False
-
-    # @xtr4nge
-    def getStatus(self):
-        self.pluginStatus = ConfigObj("config/plugins.conf")
-        if self.pluginStatus['plugins'][self.optname]['status'] == "enabled":
-            return True
-        else:
-            return False
 
     def initialize(self, options):
         self.output = {}  # so other plugins can access the results
@@ -63,20 +53,18 @@ class BrowserProfiler(Inject, Plugin):
         return d
 
     def clientRequest(self, request):
-        if self.getStatus():
-            #Handle the plugin output
-            if 'clientprfl' in request.uri:
-                request.printPostData = False 
-    
-                self.output = self.post2dict(request.postData)
-                self.output['ip'] = request.client.getClientIP()
-                self.output['useragent'] = request.clientInfo
-    
-                if self.output['plugin_list']:
-                    self.output['plugin_list'] = self.output['plugin_list'].split(',')
-                
-                pretty_output = pformat(self.output)
-                mitmf_logger.info("{} [BrowserProfiler] Got data:\n{}".format(request.client.getClientIP(), pretty_output))
+        if 'clientprfl' in request.uri:
+            request.printPostData = False 
+
+            self.output = self.post2dict(request.postData)
+            self.output['ip'] = request.client.getClientIP()
+            self.output['useragent'] = request.clientInfo
+
+            if self.output['plugin_list']:
+                self.output['plugin_list'] = self.output['plugin_list'].split(',')
+            
+            pretty_output = pformat(self.output)
+            mitmf_logger.info("{} [BrowserProfiler] Got data:\n{}".format(request.client.getClientIP(), pretty_output))
 
     def get_payload(self):
         plugindetect = open("./core/javascript/plugindetect.js", 'r').read()

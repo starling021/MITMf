@@ -14,17 +14,17 @@ class ConfigWatcher(FileSystemEventHandler):
     _instance = None
     config = ConfigObj("./config/mitmf.conf")
 
+    def __init__(self):
+        observer = Observer()
+        observer.schedule(self, path='./config', recursive=False)
+        observer.start()
+
     @staticmethod
     def getInstance():
         if ConfigWatcher._instance is None:
             ConfigWatcher._instance = ConfigWatcher()
 
         return ConfigWatcher._instance
-
-    def startConfigWatch(self):
-        observer = Observer()
-        observer.schedule(self, path='./config', recursive=False)
-        observer.start()
 
     def getConfig(self):
         return self.config
