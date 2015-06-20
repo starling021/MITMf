@@ -45,11 +45,10 @@ class Upsidedownternet(Plugin):
 
     def serverHeaders(self, response, request):
         '''Kill the image skipping that's in place for speed reasons'''
-        if self.getStatus():
-            if request.isImageRequest:
-                request.isImageRequest = False
-                request.isImage = True
-                self.imageType = response.headers['content-type'].split('/')[1].upper()
+        if request.isImageRequest:
+            request.isImageRequest = False
+            request.isImage = True
+            self.imageType = response.headers['content-type'].split('/')[1].upper()
 
     def serverResponse(self, response, request, data):
         try:

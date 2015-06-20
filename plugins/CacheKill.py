@@ -45,8 +45,7 @@ class CacheKill(Plugin):
 
     def clientRequest(self, request):
         '''Handles outgoing request'''
-        if self.getStatus():
-            request.headers['pragma'] = 'no-cache'
-            for header in self.bad_headers:
-                if header in request.headers:
-                    del request.headers[header]
+        request.headers['pragma'] = 'no-cache'
+        for header in self.bad_headers:
+            if header in request.headers:
+                del request.headers[header]

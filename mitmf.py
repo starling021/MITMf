@@ -169,11 +169,6 @@ print "|"
 print "|_ Sergio-Proxy v{} online".format(sergio_version)
 print "|_ SSLstrip v{} by Moxie Marlinspike online".format(sslstrip_version)
 
-#Start MITMf-API
-from core.mitmfapi import mitmfapi
-mitmfapi().start()
-print "|_ MITMf-API running on http://{}:{}/".format(mitmfapi.getInstance().host, mitmfapi.getInstance().port)
-
 #Start Net-Creds
 from core.netcreds.NetCreds import NetCreds
 NetCreds().start(args.interface, myip)
@@ -191,8 +186,14 @@ print "|_ HTTP server online"
 
 #Start the SMB server
 from core.servers.smb.SMBserver import SMBserver
-print "|_ SMB server online [Mode: {}] (Impacket {}) \n".format(SMBserver.getInstance().server_type, SMBserver.getInstance().impacket_ver)
+print "|_ SMB server online [Mode: {}] (Impacket {})".format(SMBserver.getInstance().server_type, SMBserver.getInstance().impacket_ver)
 SMBserver.getInstance().start()
+
+#Start MITMf-API
+from core.mitmfapi import mitmfapi
+mitmfapi().start()
+print "|"
+print "|_ MITMf-API running on http://{}:{}\n".format(mitmfapi.getInstance().host, mitmfapi.getInstance().port)
 
 #start the reactor
 reactor.run()

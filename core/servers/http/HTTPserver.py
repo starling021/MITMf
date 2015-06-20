@@ -19,7 +19,6 @@
 #
 
 import logging
-import sys
 import threading
 
 from core.configwatcher import ConfigWatcher
@@ -39,7 +38,7 @@ class HTTPserver:
         return HTTPserver._instance
 
     def startFlask(self):
-        self.server.run(host='0.0.0.0', port=self.port)
+        self.server.run(debug=False, host='0.0.0.0', port=self.port)
 
     def start(self):
         server_thread = threading.Thread(name='HTTPserver', target=self.startFlask)

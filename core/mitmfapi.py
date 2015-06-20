@@ -36,9 +36,6 @@ from core.sergioproxy.ProxyPlugins import ProxyPlugins
 
 app = Flask(__name__)
 
-#log = logging.getLogger('werkzeug')
-#log.setLevel(logging.DEBUG)
-
 class mitmfapi:
 
     _instance = None
@@ -98,7 +95,7 @@ class mitmfapi:
         return json.dumps({"plugin": plugin, "response": "failed"})
 
     def startFlask(self):
-        app.run(host=self.host, port=self.port)
+        app.run(debug=False, host=self.host, port=self.port)
 
     #def start(self):
     #    api_thread = multiprocessing.Process(name="mitmfapi", target=self.startFlask)
