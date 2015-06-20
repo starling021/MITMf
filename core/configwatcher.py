@@ -14,11 +14,6 @@ class ConfigWatcher(FileSystemEventHandler):
     _instance = None
     config = ConfigObj("./config/mitmf.conf")
 
-    def __init__(self):
-        observer = Observer()
-        observer.schedule(self, path='./config', recursive=False)
-        observer.start()
-
     @staticmethod
     def getInstance():
         if ConfigWatcher._instance is None:
@@ -33,6 +28,11 @@ class ConfigWatcher(FileSystemEventHandler):
         mitmf_logger.debug("[{}] Detected configuration changes, reloading!".format(self.__class__.__name__))
         self.reloadConfig()
         self.onConfigChange()
+
+    def startConfigWatch(self):
+        observer = Observer()
+        observer.schedule(self, path='./config', recursive=False)
+        observer.start()
 
     def onConfigChange(self):
         """ We can subclass this function to do stuff after the config file has been modified"""

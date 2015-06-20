@@ -1,6 +1,6 @@
 #!/usr/bin/env python2.7
 
-# Copyright (c) 2014-2016 Moxie Marlinspike, Marcello Salvati
+# Copyright (c) 2014-2016 Marcello Salvati
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -31,18 +31,30 @@ import json
 import sys
 
 from flask import Flask
+from core.configwatcher import ConfigWatcher
 from core.sergioproxy.ProxyPlugins import ProxyPlugins
 
 app = Flask(__name__)
 
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.DEBUG)
+#log = logging.getLogger('werkzeug')
+#log.setLevel(logging.DEBUG)
 
 class mitmfapi:
 
+    _instance = None
+    host = ConfigWatcher.getInstance().config['MITMf']['MITMf-API']['host']
+    port = int(ConfigWatcher.getInstance().config['MITMf']['MITMf-API']['port'])
+
+    @staticmethod
+    def getInstance():
+        if mitmfapi._instance is None:
+            mitmfapi._instance = mitmfapi()
+
+        return mitmfapi._instance
+
     @app.route("/")
     def getPlugins():
-        # example: http://127.0.0.1:9090/getPlugins
+        # example: http://127.0.0.1:9090/
         pdict = {}
         
         #print ProxyPlugins.getInstance().plist
@@ -60,7 +72,7 @@ class mitmfapi:
 
     @app.route("/<plugin>")
     def getPluginStatus(plugin):
-        # example: http://127.0.0.1:9090/getPluginStatus/cachekill
+        # example: http://127.0.0.1:9090/cachekill
         for p in ProxyPlugins.getInstance().plist:
             if plugin == p.name:
                 return json.dumps("1")
@@ -69,8 +81,8 @@ class mitmfapi:
 
     @app.route("/<plugin>/<status>")
     def setPluginStatus(plugin, status):
-        # example: http://127.0.0.1:9090/setPluginStatus/cachekill/1 # enabled
-        # example: http://127.0.0.1:9090/setPluginStatus/cachekill/0 # disabled
+        # example: http://127.0.0.1:9090/cachekill/1 # enabled
+        # example: http://127.0.0.1:9090/cachekill/0 # disabled
         if status == "1":
             for p in ProxyPlugins.getInstance().plist_all:
                 if (p.name == plugin) and (p not in ProxyPlugins.getInstance().plist):
@@ -85,8 +97,8 @@ class mitmfapi:
 
         return json.dumps({"plugin": plugin, "response": "failed"})
 
-    def startFlask(self, host='127.0.0.1', port=9090):
-        app.run(host=host, port=port)
+    def startFlask(self):
+        app.run(host=self.host, port=self.port)
 
     #def start(self):
     #    api_thread = multiprocessing.Process(name="mitmfapi", target=self.startFlask)

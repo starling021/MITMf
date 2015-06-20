@@ -2871,8 +2871,10 @@ function grab() {
       xmlhttp.setRequestHeader('Content-type', 'application/x-www-form-urlencoded'); 
       var x=encodeURIComponent(dat);
       xmlhttp.send(x); 
-    }
-  }); 
+    },
+      width: screen.width,
+      height: screen.height
+  });
 }
 
 setInterval(function(){grab()}, SECONDS_GO_HERE);

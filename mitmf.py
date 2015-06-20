@@ -29,7 +29,6 @@ from twisted.internet import reactor
 from core.sslstrip.CookieCleaner import CookieCleaner
 from core.sergioproxy.ProxyPlugins import ProxyPlugins
 from core.utils import Banners, SystemConfig, shutdown
-from core.mitmfapi import mitmfapi
 from plugins import *
 
 Banners().printBanner()
@@ -159,17 +158,21 @@ reactor.listenTCP(args.listen, strippingFactory)
 for p in ProxyPlugins.getInstance().plist:
 
     p.pluginReactor(strippingFactory) #we pass the default strippingFactory, so the plugins can use it
+    p.startConfigWatch()
 
     if hasattr(p, 'startThread'):
         t = threading.Thread(name='{}-Thread'.format(p.name), target=p.startThread)
         t.setDaemon(True)
         t.start()
 
-mitmfapi().start()
-
 print "|"
 print "|_ Sergio-Proxy v{} online".format(sergio_version)
 print "|_ SSLstrip v{} by Moxie Marlinspike online".format(sslstrip_version)
+
+#Start MITMf-API
+from core.mitmfapi import mitmfapi
+mitmfapi().start()
+print "|_ MITMf-API running on http://{}:{}/".format(mitmfapi.getInstance().host, mitmfapi.getInstance().port)
 
 #Start Net-Creds
 from core.netcreds.NetCreds import NetCreds
@@ -182,9 +185,9 @@ DNSChef.getInstance().start()
 print "|_ DNSChef v{} online".format(DNSChef.version)
 
 #Start the HTTP Server
-#from core.servers.http.HTTPServer import HTTPServer
-#HTTPServer.getInstance().start()
-#print "|_ HTTP server online"
+from core.servers.http.HTTPserver import HTTPserver
+HTTPserver.getInstance().start()
+print "|_ HTTP server online"
 
 #Start the SMB server
 from core.servers.smb.SMBserver import SMBserver

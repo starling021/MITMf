@@ -10,7 +10,7 @@ mitmf_logger = logging.getLogger('mitmf')
 class Plugin(ConfigWatcher, object):
     name        = "Generic plugin"
     optname     = "generic"
-    tree_info   = list()
+    tree_info   = []
     desc        = ""
     version     = "0.0"
     has_opts    = False

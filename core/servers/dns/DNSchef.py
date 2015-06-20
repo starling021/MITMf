@@ -420,8 +420,6 @@ class DNSChef(ConfigWatcher):
     version = "0.4"
 
     def __init__(self):
-        ConfigWatcher.__init__(self)
-
         self.tcp            = False
         self.ipv6           = False
         self.hsts           = False
@@ -430,8 +428,6 @@ class DNSChef(ConfigWatcher):
         self.server_address = "0.0.0.0"
         self.nameservers    = ["8.8.8.8"]
         self.port           = 53
-        
-        self.onConfigChange()
 
     @staticmethod
     def getInstance():
@@ -477,6 +473,9 @@ class DNSChef(ConfigWatcher):
         self.hsts = True
 
     def start(self):
+        self.onConfigChange()
+        self.startConfigWatch()
+
         try:
             if self.config['MITMf']['DNS']['tcp'].lower() == 'on':
                 self.startTCP()

