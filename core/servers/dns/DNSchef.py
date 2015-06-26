@@ -31,8 +31,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import threading, random, operator, time
-import SocketServer, socket, sys, os
+import threading
+import random
+import operator 
+import time
+import SocketServer 
+import socket 
+import sys
+import os
 import binascii
 import string
 import base64
@@ -41,16 +47,19 @@ import logging
 
 from configobj import ConfigObj
 from core.configwatcher import ConfigWatcher
-from core.utils import shutdown
 
 from mitmflib.dnslib import *
 from IPy import IP
 
-formatter = logging.Formatter("%(asctime)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-dnschef_logger = logging.getLogger('dnschef')
+formatter = logging.Formatter("%(asctime)s %(clientip)s [DNS] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+logger = logging.getLogger('dnschef')
+logger.propagate = False
 fileHandler = logging.FileHandler("./logs/dnschef/dnschef.log")
 fileHandler.setFormatter(formatter)
-dnschef_logger.addHandler(fileHandler)
+streamHandler = logging.StreamHandler(sys.stdout)
+streamHandler.setFormatter(formatter)
+logger.addHandler(fileHandler)
+logger.addHandler(streamHandler)
 
 # DNSHandler Mixin. The class contains generic functions to parse DNS requests and
 # calculate an appropriate response based on user parameters.
@@ -58,11 +67,12 @@ class DNSHandler():
            
     def parse(self,data):
 
-        nametodns      = DNSChef.getInstance().nametodns
-        nameservers    = DNSChef.getInstance().nameservers
-        hsts           = DNSChef.getInstance().hsts
-        hstsconfig     = DNSChef.getInstance().real_records
-        server_address = DNSChef.getInstance().server_address
+        nametodns      = DNSChef().nametodns
+        nameservers    = DNSChef().nameservers
+        hsts           = DNSChef().hsts
+        hstsconfig     = DNSChef().real_records
+        server_address = DNSChef().server_address
+        self.clientip       = {'clientip': self.client_address[0]}
 
         response = ""
     
@@ -71,7 +81,7 @@ class DNSHandler():
             d = DNSRecord.parse(data)
 
         except Exception, e:
-            dnschef_logger.info("{} [DNSChef] Error: invalid DNS request".format(self.client_address[0]))
+            logger.info("Error: invalid DNS request", extra=self.clientip)
 
         else:        
             # Only Process DNS Queries
@@ -115,7 +125,7 @@ class DNSHandler():
                     # Create a custom response to the query
                     response = DNSRecord(DNSHeader(id=d.header.id, bitmap=d.header.bitmap, qr=1, aa=1, ra=1), q=d.q)
 
-                    dnschef_logger.info("{} [DNSChef] Cooking the response of type '{}' for {} to {}".format(self.client_address[0], qtype, qname, fake_record))
+                    logger.info("Cooking the response of type '{}' for {} to {}".format(qtype, qname, fake_record), extra=self.clientip)
 
                     # IPv6 needs additional work before inclusion:
                     if qtype == "AAAA":
@@ -184,7 +194,7 @@ class DNSHandler():
                     response = response.pack()
 
                 elif qtype == "*" and not None in fake_records.values():
-                    dnschef_logger.info("{} [DNSChef] Cooking the response of type '{}' for {} with {}".format(self.client_address[0], "ANY", qname, "all known fake records."))
+                    logger.info("Cooking the response of type '{}' for {} with {}".format("ANY", qname, "all known fake records."), extra=self.clientip)
 
                     response = DNSRecord(DNSHeader(id=d.header.id, bitmap=d.header.bitmap,qr=1, aa=1, ra=1), q=d.q)
 
@@ -259,7 +269,7 @@ class DNSHandler():
 
                 # Proxy the request
                 else:
-                    dnschef_logger.debug("{} [DNSChef] Proxying the response of type '{}' for {}".format(self.client_address[0], qtype, qname))
+                    logger.debug("Proxying the response of type '{}' for {}".format(qtype, qname), extra=self.clientip)
 
                     nameserver_tuple = random.choice(nameservers).split('#')               
                     response = self.proxyrequest(data, *nameserver_tuple)
@@ -303,7 +313,7 @@ class DNSHandler():
     def proxyrequest(self, request, host, port="53", protocol="udp"):
         reply = None
         try:
-            if DNSChef.getInstance().ipv6:
+            if DNSChef().ipv6:
 
                 if protocol == "udp":
                     sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
@@ -339,13 +349,13 @@ class DNSHandler():
                 sock.close()
 
         except Exception, e:
-            dnschef_logger.warning("[DNSChef] Could not proxy request: {}".format(e))
+            logger.warning("Error: Could not proxy request: {}".format(e), extra=self.clientip)
         else:
             return reply
 
     def hstsbypass(self, real_domain, fake_domain, nameservers, d):
 
-        dnschef_logger.info("{} [DNSChef] Resolving '{}' to '{}' for HSTS bypass".format(self.client_address[0], fake_domain, real_domain))
+        logger.info("Resolving '{}' to '{}' for HSTS bypass".format(fake_domain, real_domain), extra=self.clientip)
 
         response = DNSRecord(DNSHeader(id=d.header.id, bitmap=d.header.bitmap, qr=1, aa=1, ra=1), q=d.q)
 
@@ -399,7 +409,7 @@ class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
 
     # Override SocketServer.UDPServer to add extra parameters
     def __init__(self, server_address, RequestHandlerClass):
-        self.address_family = socket.AF_INET6 if DNSChef.getInstance().ipv6 else socket.AF_INET
+        self.address_family = socket.AF_INET6 if DNSChef().ipv6 else socket.AF_INET
 
         SocketServer.UDPServer.__init__(self,server_address,RequestHandlerClass) 
 
@@ -410,16 +420,18 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
 
     # Override SocketServer.TCPServer to add extra parameters
     def __init__(self, server_address, RequestHandlerClass):
-        self.address_family = socket.AF_INET6 if DNSChef.getInstance().ipv6 else socket.AF_INET
+        self.address_family = socket.AF_INET6 if DNSChef().ipv6 else socket.AF_INET
 
         SocketServer.TCPServer.__init__(self,server_address,RequestHandlerClass) 
 
 class DNSChef(ConfigWatcher):
 
-    _instance = None
     version = "0.4"
+    __shared_state = {}
 
     def __init__(self):
+        self.__dict__ = self.__shared_state
+
         self.tcp            = False
         self.ipv6           = False
         self.hsts           = False
@@ -429,14 +441,7 @@ class DNSChef(ConfigWatcher):
         self.nameservers    = ["8.8.8.8"]
         self.port           = 53
 
-    @staticmethod
-    def getInstance():
-        if DNSChef._instance == None:
-            DNSChef._instance = DNSChef()
-
-        return DNSChef._instance
-
-    def onConfigChange(self):
+    def on_config_change(self):
         config = self.config['MITMf']['DNS']
         
         self.port = int(config['port'])
@@ -473,8 +478,8 @@ class DNSChef(ConfigWatcher):
         self.hsts = True
 
     def start(self):
-        self.onConfigChange()
-        self.startConfigWatch()
+        self.on_config_change()
+        self.start_config_watch()
 
         try:
             if self.config['MITMf']['DNS']['tcp'].lower() == 'on':
@@ -483,7 +488,7 @@ class DNSChef(ConfigWatcher):
                 self.startUDP()
         except socket.error as e:
             if "Address already in use" in e:
-                shutdown("\n[DNSChef] Unable to start DNS server on port {}: port already in use".format(self.config['MITMf']['DNS']['port']))
+                sys.exit("\n[DNSChef] Unable to start DNS server on port {}: port already in use".format(self.config['MITMf']['DNS']['port']))
 
     # Initialize and start the DNS Server        
     def startUDP(self):

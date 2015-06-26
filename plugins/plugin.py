@@ -2,38 +2,50 @@
 The base plugin class. This shows the various methods that
 can get called during the MITM attack. 
 '''
-from core.configwatcher import ConfigWatcher
+import argparse
 import logging
 
-mitmf_logger = logging.getLogger('mitmf')
+from core.configwatcher import ConfigWatcher
 
 class Plugin(ConfigWatcher, object):
-    name        = "Generic plugin"
-    optname     = "generic"
-    desc        = ""
-    version     = "0.0"
-    has_opts    = False
+    name    = "Generic plugin"
+    optname = "generic"
+    desc    = ""
+    version = "0.0"
 
-    def initialize(self, options):
-        '''Called if plugin is enabled, passed the options namespace'''
-        self.options = options
+    def __init__(self, parser):
+        '''Passed the options namespace'''
+        if self.desc:
+            sgroup = parser.add_argument_group(self.name, self.desc)
+        else:
+            sgroup = parser.add_argument_group(self.name,"Options for the '{}' plugin".format(self.name))
 
-    def handle_clientconnect(self, context, handler):
+        sgroup.add_argument("--{}".format(self.optname), action="store_true",help="Load plugin '{}'".format(self.name))
+
+        self.plugin_options(sgroup)
+
+    def initialize(self, context):
+        '''Called when plugin is started'''
+        self.options = context.options
+        self.start_config_watch()
+
+    def request(self, context, flow):
         pass
 
-    def handle_request(self, flow):
+    def responseheaders(self, context, flow):
         pass
 
-    def handle_serverconnect(self, context, handler):
-        pass
-        
-    def handle_response(self, flow):
+    def response(self, context, flow):
         pass
 
-    def options(self, options):
+    def on_config_change(self):
+        """Do something when MITMf detects the config file has been modified"""
+        pass
+
+    def plugin_options(self, options):
         '''Add your options to the options parser'''
         pass
 
-    def onShutdown(self):
+    def on_shutdown(self, context):
         '''This will be called when shutting down'''
         pass

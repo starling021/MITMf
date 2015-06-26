@@ -28,79 +28,86 @@ import sys
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)  #Gets rid of IPV6 Error when importing scapy
 from scapy.all import get_if_addr, get_if_hwaddr
 
-mitmf_logger = logging.getLogger('mitmf')
+#formatter = logging.Formatter("%(asctime)s [Utils] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+#logger = log_engine.g.setup_logger('utils', formatter)
 
-#def shutdown(message=None):
-#    for plugin in ProxyPlugins.getInstance().plist:
-#        plugin.finish()
-#    sys.exit(message)
+def set_ip_forwarding(value):
+    #logger.debug("Setting ip forwarding to {}".format(value))
+    with open('/proc/sys/net/ipv4/ip_forward', 'w') as file:
+        file.write(str(value))
+        file.close()
 
-class SystemConfig:
+def get_ip(interface):
+    try:
+        ip_address = get_if_addr(interface)
+        if (ip_address == "0.0.0.0") or (ip_address is None):
+            sys.exit("[-] {} does not have an assigned ip address".format(interface))
 
-    @staticmethod
-    def setIpForwarding(value):
-        mitmf_logger.debug("[Utils] Setting ip forwarding to {}".format(value))
-        with open('/proc/sys/net/ipv4/ip_forward', 'w') as file:
-            file.write(str(value))
-            file.close()
-    
-    @staticmethod
-    def getIP(interface):
-        try:
-            ip_address = get_if_addr(interface)
-            if (ip_address == "0.0.0.0") or (ip_address is None):
-                shutdown("[Utils] Interface {} does not have an assigned IP address".format(interface))
+        return ip_address
+    except Exception as e:
+        sys.exit("[-] Error retrieving ip address from {}: {}".format(interface, e))
 
-            return ip_address
-        except Exception, e:
-            shutdown("[Utils] Error retrieving IP address from {}: {}".format(interface, e))
-    
-    @staticmethod
-    def getMAC(interface):
-        try:
-            mac_address = get_if_hwaddr(interface)
-            return mac_address
-        except Exception, e:
-            shutdown("[Utils] Error retrieving MAC address from {}: {}".format(interface, e))
+def get_mac(interface):
+    try:
+        mac_address = get_if_hwaddr(interface)
+        return mac_address
+    except Exception as e:
+        sys.exit("[-] Error retrieving mac address from {}: {}".format(interface, e))
 
-class IpTables:
+class logger_setup:
 
-    _instance = None
+    log_level = None
+    __shared_state = {}
 
     def __init__(self):
-        self.dns       = False
-        self.http      = False
-        self.smb       = False
+        self.__dict__ = self.__shared_state
 
-    @staticmethod
-    def getInstance():
-        if IpTables._instance == None:
-            IpTables._instance = IpTables()
+    def setup_logger(self, name, formatter, logfile='./logs/mitmf.log'):
+        fileHandler = logging.FileHandler(logfile)
+        fileHandler.setFormatter(formatter)
+        streamHandler = logging.StreamHandler(sys.stdout)
+        streamHandler.setFormatter(formatter)
 
-        return IpTables._instance
+        logger = logging.getLogger(name)
+        logger.propagate = False
+        logger.addHandler(streamHandler)
+        logger.addHandler(fileHandler)
+        logger.setLevel(self.log_level)
 
-    def Flush(self):
-        mitmf_logger.debug("[Utils] Flushing iptables")
+        return logger
+
+class iptables:
+
+    __shared_state = {}
+
+    def __init__(self):
+        self.__dict__  = self.__shared_state
+        self._dns       = False
+        self._http      = False
+        self._smb       = False
+
+    def flush(self):
+        #logger.debug("Flushing iptables")
         os.system('iptables -F && iptables -X && iptables -t nat -F && iptables -t nat -X')
-        self.dns  = False
-        self.http = False
+        self._dns  = False
+        self._http = False
 
-    def HTTP(self, http_redir_port):
-        mitmf_logger.debug("[Utils] Setting iptables HTTP redirection rule from port 80 to {}".format(http_redir_port))
+    def http(self, http_redir_port):
+        #logger.debug("Setting iptables HTTP redirection rule from port 80 to {}".format(http_redir_port))
         os.system('iptables -t nat -A PREROUTING -p tcp --destination-port 80 -j REDIRECT --to-port {}'.format(http_redir_port))
-        self.http = True
+        self._http = True
 
-    def DNS(self, dns_redir_port):
-        mitmf_logger.debug("[Utils] Setting iptables DNS redirection rule from port 53 to {}".format(dns_redir_port))
+    def dns(self, dns_redir_port):
+        #logger.debug("Setting iptables DNS redirection rule from port 53 to {}".format(dns_redir_port))
         os.system('iptables -t nat -A PREROUTING -p udp --destination-port 53 -j REDIRECT --to-port {}'.format(dns_redir_port))
-        self.dns = True
+        self._dns = True
 
-    def SMB(self, smb_redir_port):
-        mitmf_logger.debug("[Utils] Setting iptables SMB redirection rule from port 445 to {}".format(smb_redir_port))
+    def smb(self, smb_redir_port):
+        #logger.debug("Setting iptables SMB redirection rule from port 445 to {}".format(smb_redir_port))
         os.system('iptables -t nat -A PREROUTING -p tcp --destination-port 445 -j REDIRECT --to-port {}'.format(smb_redir_port))
-        self.smb = True
+        self._smb = True
 
-class Banners:
+class banners:
 
     banner1 = """                                                    
  __  __   ___   .--.          __  __   ___              
@@ -162,6 +169,6 @@ class Banners:
 ╚═╝     ╚═╝╚═╝   ╚═╝   ╚═╝     ╚═╝╚═╝     
 """
     
-    def printBanner(self):
+    def get_banner(self):
         banners = [self.banner1, self.banner2, self.banner3, self.banner4, self.banner5]
-        print random.choice(banners)
+        return random.choice(banners)
