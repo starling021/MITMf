@@ -32,7 +32,7 @@ function make_xhr(){
             }
         }
 
-        var data = [];
+        var data = {};
         
         var PD = PluginDetect;
         
@@ -40,37 +40,35 @@ function make_xhr(){
         PD.getVersion(".");
 
         //Try to get plugin list
-        var pluginList = '';
+        var pluginList = [];
         if (navigator.plugins) {
             for (var p = 0; p < navigator.plugins.length; p++) {
-                var pName = navigator.plugins[p].name + ',';
-                pluginList += pName;
+                var pName = navigator.plugins[p].name;
+                pluginList.push(pName);
             }
         }
 
         if (pluginList.length > 0){
-            data.push('plugin_list=' + pluginList);
+            data['pluginlist'] = pluginList;
         }
         
         //Check if java plugin is installed and/or enabled
         var javaEnabled = PD.isMinVersion('java');
-        data.push('java_installed=' + javaEnabled);
+        data['java'] = javaEnabled;
 
         //Get exact java plugin version
         var javaVersionString = PD.getVersion('java');
-        data.push('java_version=' + javaVersionString);
+        data['java_v'] = javaVersionString;
 
         //Check if flash plugin is installed and/or enabled
         var flashEnabled = PD.isMinVersion('flash');
-        data.push('flash_installed=' + flashEnabled);
+        data['flash'] = flashEnabled;
         
         //Get exact flash plugin version
         var flashVersionString = PD.getVersion('flash');
-        data.push('flash_version=' + flashVersionString);
+        data['flash_v'] = flashVersionString;
 
-        if (data.length > 0) {
-            var datajoined = data.join("&");
-            xhr.open("POST", "clientprfl", true);
-            xhr.setRequestHeader("Content-type","application/x-www-form-urlencoded");
-            xhr.send(datajoined);
-        }
+ 
+        xhr.open("POST", "clientprfl", true);
+        xhr.setRequestHeader("Content-Type", "application/json; charset=UTF-8");
+        xhr.send(JSON.stringify(data));

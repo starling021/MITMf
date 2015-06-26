@@ -1,6 +1,6 @@
 '''
 The base plugin class. This shows the various methods that
-can get called during the MITM attack. 
+can get called during the MITM attack.
 '''
 import argparse
 import logging

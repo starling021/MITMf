@@ -1,4 +1,3 @@
-import traceback
 import argparse
 import threading
 import logging
@@ -9,7 +8,6 @@ from functools import wraps
 from core.utils import banners, get_ip, get_mac, logger_setup
 from mitmflib.user_agents import parse
 from libmproxy import controller, proxy
-from libmproxy.protocol.http import decoded
 from libmproxy.proxy.server import ProxyServer
 
 from core.servers.dns.DNSchef import DNSChef
@@ -75,11 +73,12 @@ def concurrent(func):
 class StickyMaster(controller.Master):
     def __init__(self, server):
         controller.Master.__init__(self, server)
- 
-        options.ip      = get_ip(options.interface)
-        options.mac     = get_mac(options.interface)
-        self.mode       = server.config.mode
-        self.options    = options
+
+        options.ip       = get_ip(options.interface)
+        options.mac      = get_mac(options.interface)
+        self.mode        = server.config.mode
+        self.options     = options
+        self.handle_post_output = False
 
         for key, value in vars(options).iteritems():
             setattr(self, key, value)
@@ -135,11 +134,10 @@ class StickyMaster(controller.Master):
             plugin_hook = getattr(plugin, 'request')
             plugin_hook(self, flow)
 
-        if flow.request.method == "POST" and flow.request.content:
-            try:
-                logger.info("POST Data ({}):\n{}".format(flow.request.host, flow.request.content), extra=self.clientinfo)
-            except Exception as e:
-                pass
+        if flow.request.method == "POST" and flow.request.content and (self.handle_post_output is False):
+            logger.info("POST Data ({}):\n{}".format(flow.request.host, flow.request.content), extra=self.clientinfo)
+
+        self.handle_post_output = False
 
         flow.reply()
 
