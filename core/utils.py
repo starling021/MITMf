@@ -1,4 +1,3 @@
-#! /usr/bin/env python2.7
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2014-2016 Marcello Salvati
@@ -54,43 +53,28 @@ def get_mac(interface):
     except Exception as e:
         sys.exit("[-] Error retrieving mac address from {}: {}".format(interface, e))
 
-class logger_setup:
-
-    log_level = None
-    __shared_state = {}
-
-    def __init__(self):
-        self.__dict__ = self.__shared_state
-
-    def setup_logger(self, name, formatter, logfile='./logs/mitmf.log'):
-        fileHandler = logging.FileHandler(logfile)
-        fileHandler.setFormatter(formatter)
-        streamHandler = logging.StreamHandler(sys.stdout)
-        streamHandler.setFormatter(formatter)
-
-        logger = logging.getLogger(name)
-        logger.propagate = False
-        logger.addHandler(streamHandler)
-        logger.addHandler(fileHandler)
-        logger.setLevel(self.log_level)
-
-        return logger
-
 class iptables:
 
     __shared_state = {}
 
     def __init__(self):
-        self.__dict__  = self.__shared_state
-        self._dns       = False
-        self._http      = False
-        self._smb       = False
+        self.__dict__ = self.__shared_state
+        self._dns     = False
+        self._http    = False
+        self._smb     = False
+        self._wpad    = False
 
     def flush(self):
         #logger.debug("Flushing iptables")
         os.system('iptables -F && iptables -X && iptables -t nat -F && iptables -t nat -X')
         self._dns  = False
         self._http = False
+        self._smb  = False
+        self._wpad = False
+
+    def wpad(self, wpad_redir_port):
+        os.system('iptables -t nat -A PREROUTING -p tcp --destination-port 3141 -j REDIRECT --to-port {}'.format(wpad_redir_port))
+        self._wpad = True
 
     def http(self, http_redir_port):
         #logger.debug("Setting iptables HTTP redirection rule from port 80 to {}".format(http_redir_port))
